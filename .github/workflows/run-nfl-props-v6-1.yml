@@ -2,6 +2,17 @@ name: Phoenix NFL Props V6.1 Production Run
 
 on:
   workflow_dispatch:
+    inputs:
+      season:
+        description: Target NFL season
+        required: true
+        default: "2026"
+        type: string
+      week:
+        description: Optional NFL week override; blank = next unplayed week
+        required: false
+        default: ""
+        type: string
   push:
     branches: [main]
 
@@ -16,6 +27,9 @@ jobs:
     defaults:
       run:
         working-directory: Phoenix_NFL_Props_V6_1
+    env:
+      PHOENIX_TARGET_SEASON: ${{ github.event_name == 'workflow_dispatch' && inputs.season || '2026' }}
+      PHOENIX_TARGET_WEEK: ${{ github.event_name == 'workflow_dispatch' && inputs.week || '' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -30,6 +44,49 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
+      - name: Resolve current NFL week
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os, re
+          import pandas as pd
+          import nflreadpy as nfl
+          from pathlib import Path
+
+          season = int(os.environ.get("PHOENIX_TARGET_SEASON", "2026"))
+          override = os.environ.get("PHOENIX_TARGET_WEEK", "").strip()
+          if override:
+              week = int(override)
+              source = "workflow override"
+          else:
+              s = nfl.load_schedules([season]).to_pandas()
+              s["season"] = pd.to_numeric(s["season"], errors="coerce")
+              s["week"] = pd.to_numeric(s["week"], errors="coerce")
+              future = s[
+                  s["season"].eq(season)
+                  & s["home_score"].isna()
+                  & s["away_score"].isna()
+              ].copy()
+              if "game_type" in future.columns:
+                  future = future[future["game_type"].astype(str).str.upper().eq("REG")]
+              cols = [c for c in ["gameday","gametime"] if c in future.columns]
+              if cols:
+                  future = future.sort_values(cols)
+              if future.empty:
+                  raise RuntimeError(f"No unplayed regular-season NFL games found for {season}")
+              week = int(future.iloc[0]["week"])
+              source = "next unplayed schedule"
+
+          p = Path("nfl_props_v6_1.py")
+          text = p.read_text(encoding="utf-8")
+          text, n1 = re.subn(r"^TARGET_SEASON\s*=\s*\d+\s*$", f"TARGET_SEASON = {season}", text, count=1, flags=re.M)
+          text, n2 = re.subn(r"^TARGET_WEEK\s*=\s*\d+\s*$", f"TARGET_WEEK = {week}", text, count=1, flags=re.M)
+          if n1 != 1 or n2 != 1:
+              raise RuntimeError(f"Could not patch target config safely: season={n1}, week={n2}")
+          p.write_text(text, encoding="utf-8")
+          print(f"Resolved Phoenix NFL Props target: {season} Week {week} ({source})")
+          PY
 
       - name: Restore NFL props warehouse and cache
         uses: actions/cache@v4
