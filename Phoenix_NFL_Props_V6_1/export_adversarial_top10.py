@@ -35,6 +35,19 @@ def norm(s):
     s=re.sub(r'[^a-z0-9]+',' ',s)
     return ' '.join(s.split())
 
+def strict_json_value(v):
+    if isinstance(v, dict):
+        return {k: strict_json_value(x) for k,x in v.items()}
+    if isinstance(v, list):
+        return [strict_json_value(x) for x in v]
+    if isinstance(v, (float, np.floating)) and not np.isfinite(v):
+        return None
+    if isinstance(v, np.integer):
+        return int(v)
+    if isinstance(v, np.floating):
+        return float(v)
+    return v
+
 def main():
     key=os.environ.get('THE_ODDS_API_KEY','').strip()
     if not key:
@@ -162,7 +175,7 @@ def main():
         'candidates':top.to_dict(orient='records')
     }
     dest=out/f'PHOENIX_NFL_PROPS_TOP10_ADVERSARIAL_{season}_W{week}.json'
-    dest.write_text(json.dumps(packet,indent=2),encoding='utf-8')
+    dest.write_text(json.dumps(strict_json_value(packet),indent=2,allow_nan=False),encoding='utf-8')
     print(dest)
     print(top[['player_name','stat','side','line','book_odds','phoenix_probability']].to_string(index=False))
 
