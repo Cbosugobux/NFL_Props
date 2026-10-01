@@ -1,4 +1,4 @@
-"""Phoenix NFL Generative Player Props V6.1 — QB-coupled precision-first production build.
+"""Phoenix NFL Generative Player Props V6.1.1 — completion-conserving QB-coupled production build.
 
 V6.1 extends the V6 hurdle/generative architecture with QB-conditioned passing-environment coupling,
 while retaining time-safe ensemble learning, short-term role features, position-specific opponent context,
@@ -101,7 +101,7 @@ print("pandas:", pd.__version__)
 # ## 2. Configuration
 
 # %%
-MODEL_VERSION = "6.1.0"
+MODEL_VERSION = "6.1.1"
 TARGET_SEASON = 2026
 TARGET_WEEK = 5
 
@@ -1970,6 +1970,48 @@ def allocate_counts(total, composition):
     out[:,-1]=rem
     return out
 
+def reconcile_counts_to_capacity(count_matrix, capacity, rng):
+    """Condition integer player counts on a team-level capacity without inventing events.
+
+    Each row is treated as a population of modeled successes. If the raw player
+    total exceeds the team capacity, a multivariate-hypergeometric equivalent
+    selects which successes remain. If capacity is at least the raw total, the
+    row is returned unchanged.
+    """
+    raw=np.asarray(count_matrix,dtype=int)
+    if raw.ndim!=2:
+        raise ValueError(f"count_matrix must be 2D, got {raw.shape}")
+    raw=np.maximum(raw,0)
+    cap=np.asarray(capacity,dtype=float)
+    cap=np.nan_to_num(cap,nan=0.0,posinf=0.0,neginf=0.0)
+    cap=np.maximum(np.rint(cap),0).astype(int)
+    row_total=raw.sum(axis=1)
+    cap=np.minimum(cap,row_total)
+
+    n,k=raw.shape
+    out=np.zeros_like(raw,dtype=int)
+    rem_total=row_total.copy()
+    rem_cap=cap.copy()
+
+    for j in range(k-1):
+        ngood=raw[:,j]
+        nbad=np.maximum(rem_total-ngood,0)
+        nsample=np.minimum(rem_cap,ngood+nbad)
+        draw=rng.hypergeometric(ngood,nbad,nsample)
+        out[:,j]=draw
+        rem_cap=np.maximum(rem_cap-draw,0)
+        rem_total=np.maximum(rem_total-ngood,0)
+
+    if k:
+        out[:,-1]=np.minimum(raw[:,-1],rem_cap)
+
+    if np.any(out>raw):
+        raise RuntimeError("Completion reconciliation invented player events.")
+    if np.any(out.sum(axis=1)>cap):
+        raise RuntimeError("Completion reconciliation exceeded team capacity.")
+    return out
+
+
 def logistic_normal_composition(base_centers, active, replacement_propensity, component_name,
                                 uncertainty_multipliers, other_center):
     """
@@ -2119,7 +2161,8 @@ for team,tg in current_team.groupby("team"):
             um=float(r.uncertainty_multiplier)
             comp_rate=draw_component(cr.center_tx,PLAYER_MODELS["qb_completion_rate"],"qb_completion_rate",
                                      clip=(0.35,0.85),uncertainty_multiplier=um)
-            completions=rng.binomial(attempts,comp_rate)
+            # A completion cannot exceed the team's simulated targeted passes.
+            completions=np.minimum(rng.binomial(attempts,comp_rate),team_targets)
             ypc=draw_component(py.center_tx,PLAYER_MODELS["qb_pass_ypc"],"qb_pass_ypc",
                                clip=(5.0,22.0),uncertainty_multiplier=um)
 
@@ -2208,13 +2251,18 @@ for team,tg in current_team.groupby("team"):
         })
         alloc=allocate_counts(team_targets,comp)
 
+        # First generate player-level catch intent from targets and catch skill.
+        # V6.1.1 then conditions those catches on the selected QB's simulated
+        # completion count so player props and QB props obey the same game state.
+        rec_temp=[]
         for j,r in enumerate(recs.itertuples()):
             pid=str(r.player_id_key)
             targets=alloc[:,j]
             ca=player_lookup.get((pid,"catch_rate"))
             ry=player_lookup.get((pid,"rec_ypr"))
             OFFER_CONDITION_BANK[pid]=ACTIVE_BANK[pid]
-            if ca is None or ry is None: continue
+            if ca is None or ry is None:
+                continue
 
             um=float(r.uncertainty_multiplier)
             catch=draw_component(ca.center_tx,PLAYER_MODELS["catch_rate"],"catch_rate",
@@ -2222,38 +2270,91 @@ for team,tg in current_team.groupby("team"):
             ypr=draw_component(ry.center_tx,PLAYER_MODELS["rec_ypr"],"rec_ypr",
                                clip=(3.0,30.0),uncertainty_multiplier=um)
 
-            # V6.1: partial shared QB environment. Receiver skill remains player-specific,
-            # but the selected starter coherently shifts catches and receiving efficiency.
+            # Shared QB environment moves player skill without replacing it.
             pass_env=TEAM_PASS_ENV.get(team,{})
             catch_mult=np.asarray(pass_env.get("receiver_catch_multiplier",np.ones(N_SIMS)),dtype=float)
             ypr_mult=np.asarray(pass_env.get("receiver_ypr_multiplier",np.ones(N_SIMS)),dtype=float)
             catch=np.clip(catch*catch_mult,0.05,0.995)
             ypr=np.clip(ypr*ypr_mult,2.0,35.0)
 
-            receptions=rng.binomial(targets,catch)
-            micro=rng.normal(0,np.sqrt(np.maximum(receptions,1))*REC_MICRO_SD_PER_RECEPTION,size=N_SIMS)
-            rec_yards=np.where(receptions>0,np.maximum(0,receptions*ypr+micro),0.0)
-
-            SIM_BANK[(pid,"receptions")]=soft_tail_guard(receptions,"receptions",r.position)
-            SIM_BANK[(pid,"receiving_yards")]=soft_tail_guard(rec_yards,"receiving_yards",r.position)
-
-            DRIVER_ROWS.append({
-                "player_id_key":pid,"player_name":r.player_name,"team":team,"driver":"REC",
-                "availability_probability":float(r.availability_probability),
-                "depth_rank":float(r.depth_rank),"replacement_weight":float(r.replacement_weight),
-                "preparation_score":float(r.preparation_score),"history_reliability":float(r.history_reliability),
-                "uncertainty_multiplier":um,
-                "volume_center":float(target_rate_row.center*pass_volume_row.center),
-                "share_center":float(player_lookup[(pid,"target_share")].center),
-                "role_probability":float(role_lookup[(pid,"target_active_prob")].probability) if (pid,"target_active_prob") in role_lookup else np.nan,
-                "rate_center":float(ca.center),"eff_center":float(ry.center),
-                "qb_catch_coupling":float(QB_RECEIVER_CATCH_COUPLING if USE_QB_RECEIVER_COUPLING else 0.0),
-                "qb_ypr_coupling":float(QB_RECEIVER_YPR_COUPLING if USE_QB_RECEIVER_COUPLING else 0.0),
-                "qb_baseline_completion_rate":float(TEAM_PASS_ENV.get(team,{}).get("baseline_completion_rate",np.nan)),
-                "qb_baseline_pass_ypc":float(TEAM_PASS_ENV.get(team,{}).get("baseline_pass_ypc",np.nan))
+            raw_receptions=rng.binomial(targets,catch)
+            rec_temp.append({
+                "pid":pid,"r":r,"targets":targets,
+                "raw_receptions":raw_receptions,"ypr":ypr,
+                "um":um,"ca":ca,"ry":ry
             })
 
-        # V6.1 coupling audit. This is diagnostic, not a hard requirement for every
+        if rec_temp:
+            raw_rec_matrix=np.column_stack([x["raw_receptions"] for x in rec_temp]).astype(int)
+            pass_env=TEAM_PASS_ENV.get(team,{})
+            qb_comp=np.asarray(pass_env.get("selected_completions",raw_rec_matrix.sum(axis=1)),dtype=float)
+
+            # If there is no modeled QB environment, do not zero an otherwise valid
+            # receiver slate; otherwise the QB completion total is a hard capacity.
+            if len(qbs):
+                rec_matrix=reconcile_counts_to_capacity(raw_rec_matrix,qb_comp,rng)
+            else:
+                rec_matrix=raw_rec_matrix
+
+            raw_yard_bank={}
+            for j,item in enumerate(rec_temp):
+                receptions=rec_matrix[:,j]
+                ypr=item["ypr"]
+                micro=rng.normal(
+                    0,np.sqrt(np.maximum(receptions,1))*REC_MICRO_SD_PER_RECEPTION,
+                    size=N_SIMS
+                )
+                raw_yard_bank[item["pid"]]=np.where(
+                    receptions>0,
+                    np.maximum(0,receptions*ypr+micro),
+                    0.0
+                )
+
+            # Passing yards are the team-level yardage budget. Listed players may
+            # consume at most that budget; any unused yards belong to the existing
+            # unlisted/"other" receiving bucket.
+            total_listed_raw=np.zeros(N_SIMS,dtype=float)
+            for arr in raw_yard_bank.values():
+                total_listed_raw += arr
+
+            qb_py=np.asarray(
+                pass_env.get("selected_pass_yards",total_listed_raw),
+                dtype=float
+            )
+            yard_scale=np.ones(N_SIMS,dtype=float)
+            if len(qbs):
+                over=total_listed_raw>np.maximum(qb_py,0.0)
+                yard_scale[over]=np.divide(
+                    np.maximum(qb_py[over],0.0),
+                    np.maximum(total_listed_raw[over],1e-12)
+                )
+                yard_scale=np.clip(yard_scale,0.0,1.0)
+
+            for j,item in enumerate(rec_temp):
+                pid=item["pid"]; r=item["r"]; receptions=rec_matrix[:,j]
+                rec_yards=raw_yard_bank[pid]*yard_scale
+
+                SIM_BANK[(pid,"receptions")]=soft_tail_guard(receptions,"receptions",r.position)
+                SIM_BANK[(pid,"receiving_yards")]=soft_tail_guard(rec_yards,"receiving_yards",r.position)
+
+                ca=item["ca"]; ry=item["ry"]; um=item["um"]
+                DRIVER_ROWS.append({
+                    "player_id_key":pid,"player_name":r.player_name,"team":team,"driver":"REC",
+                    "availability_probability":float(r.availability_probability),
+                    "depth_rank":float(r.depth_rank),"replacement_weight":float(r.replacement_weight),
+                    "preparation_score":float(r.preparation_score),"history_reliability":float(r.history_reliability),
+                    "uncertainty_multiplier":um,
+                    "volume_center":float(target_rate_row.center*pass_volume_row.center),
+                    "share_center":float(player_lookup[(pid,"target_share")].center),
+                    "role_probability":float(role_lookup[(pid,"target_active_prob")].probability) if (pid,"target_active_prob") in role_lookup else np.nan,
+                    "rate_center":float(ca.center),"eff_center":float(ry.center),
+                    "qb_catch_coupling":float(QB_RECEIVER_CATCH_COUPLING if USE_QB_RECEIVER_COUPLING else 0.0),
+                    "qb_ypr_coupling":float(QB_RECEIVER_YPR_COUPLING if USE_QB_RECEIVER_COUPLING else 0.0),
+                    "qb_baseline_completion_rate":float(TEAM_PASS_ENV.get(team,{}).get("baseline_completion_rate",np.nan)),
+                    "qb_baseline_pass_ypc":float(TEAM_PASS_ENV.get(team,{}).get("baseline_pass_ypc",np.nan))
+                })
+
+        # V6.1.1 coupling/accounting audit. This is diagnostic, not a hard requirement for every
         # team because low-volume / zero-inflated receiving groups can have weak correlation.
         listed_rec_yards=np.zeros(N_SIMS,dtype=float)
         listed_receptions=np.zeros(N_SIMS,dtype=float)
@@ -2272,10 +2373,16 @@ for team,tg in current_team.groupby("team"):
         if valid.sum()>10 and np.std(qb_py[valid])>1e-9 and np.std(listed_rec_yards[valid])>1e-9:
             corr=float(np.corrcoef(qb_py[valid],listed_rec_yards[valid])[0,1])
         completion_ratio=float(np.mean(listed_receptions/np.maximum(qb_comp,1.0)))
+        yard_ratio=float(np.mean(listed_rec_yards/np.maximum(qb_py,1.0)))
+        max_completion_overrun=float(np.max(listed_receptions-qb_comp))
+        max_yard_overrun=float(np.max(listed_rec_yards-qb_py))
         QB_RECEIVER_COUPLING_QA.append({
             "team":team,
             "qb_receiving_yards_corr":corr,
             "mean_listed_receptions_to_qb_completions":completion_ratio,
+            "mean_listed_receiving_yards_to_qb_passing_yards":yard_ratio,
+            "max_listed_receptions_over_qb_completions":max_completion_overrun,
+            "max_listed_receiving_yards_over_qb_passing_yards":max_yard_overrun,
             "mean_catch_multiplier":float(np.mean(pass_env.get("receiver_catch_multiplier",np.ones(N_SIMS)))),
             "sd_catch_multiplier":float(np.std(pass_env.get("receiver_catch_multiplier",np.ones(N_SIMS)))),
             "mean_ypr_multiplier":float(np.mean(pass_env.get("receiver_ypr_multiplier",np.ones(N_SIMS)))),
@@ -2439,6 +2546,16 @@ for x in QB_RECEIVER_COUPLING_QA:
         "team":x.get("team",""),
         "check":"QB receiver coupling diagnostics finite",
         "pass":bool(all(np.isfinite(v) for v in vals))
+    })
+    qa.append({
+        "team":x.get("team",""),
+        "check":"listed receptions <= QB completions",
+        "pass":bool(float(x.get("max_listed_receptions_over_qb_completions",0.0))<=1e-9)
+    })
+    qa.append({
+        "team":x.get("team",""),
+        "check":"listed receiving yards <= QB passing yards",
+        "pass":bool(float(x.get("max_listed_receiving_yards_over_qb_passing_yards",0.0))<=1e-7)
     })
 
 for (pid,stat),arr in SIM_BANK.items():
