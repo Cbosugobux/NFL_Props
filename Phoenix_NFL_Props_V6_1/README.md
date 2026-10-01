@@ -1,4 +1,4 @@
-# Phoenix NFL Generative Player Props V6.1
+# Phoenix NFL Generative Player Props V6.1.1
 
 Precision-first, model-first NFL player-prop projection engine.
 
