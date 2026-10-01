@@ -101,6 +101,11 @@ jobs:
       - name: Run Phoenix NFL Props V6.1
         run: python nfl_props_v6_1.py
 
+      - name: Export adversarial top 10
+        env:
+          THE_ODDS_API_KEY: ${{ secrets.THE_ODDS_API_KEY }}
+        run: python export_adversarial_top10.py
+
       - name: Upload Phoenix NFL Props outputs
         if: always()
         uses: actions/upload-artifact@v4
