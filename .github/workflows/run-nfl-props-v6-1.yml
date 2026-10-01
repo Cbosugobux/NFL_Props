@@ -1,0 +1,56 @@
+name: Phoenix NFL Props V6.1 Production Run
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  run-model:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.message, 'RUN MODEL')
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    defaults:
+      run:
+        working-directory: Phoenix_NFL_Props_V6_1
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: Phoenix_NFL_Props_V6_1/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Restore NFL props warehouse and cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            Phoenix_NFL_Props_V6_1/phoenix_data/NFL_Props_Warehouse
+            Phoenix_NFL_Props_V6_1/phoenix_cache
+          key: ${{ runner.os }}-phoenix-nfl-props-v6-1-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-phoenix-nfl-props-v6-1-
+
+      - name: Run Phoenix NFL Props V6.1
+        run: python nfl_props_v6_1.py
+
+      - name: Upload Phoenix NFL Props outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phoenix-nfl-props-v6-1-${{ github.run_id }}
+          path: |
+            Phoenix_NFL_Props_V6_1/phoenix_generative_props_v6_1/
+            Phoenix_NFL_Props_V6_1/PHOENIX_NFL_GENERATIVE_PROPS_V6_1_*.zip
+          if-no-files-found: warn
+          retention-days: 14
