@@ -1,0 +1,48 @@
+name: Export NFL Props Full Adversarial Board
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  export-board:
+    if: startsWith(github.event.head_commit.message, 'EXPORT BOARD')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install exporter dependencies
+        working-directory: Phoenix_NFL_Props_V6_1
+        run: pip install numpy pandas requests
+
+      - name: Download frozen fresh model artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/phoenix
+          gh run download 36924210496             -n phoenix-nfl-props-v6-1-36924210496             -D /tmp/phoenix
+          cp -R /tmp/phoenix/phoenix_generative_props_v6_1 Phoenix_NFL_Props_V6_1/
+
+      - name: Export full matched board
+        working-directory: Phoenix_NFL_Props_V6_1
+        env:
+          THE_ODDS_API_KEY: ${{ secrets.THE_ODDS_API_KEY }}
+        run: python export_adversarial_top10.py
+
+      - name: Upload full adversarial board
+        uses: actions/upload-artifact@v4
+        with:
+          name: phoenix-nfl-props-full-board-${{ github.run_id }}
+          path: |
+            Phoenix_NFL_Props_V6_1/phoenix_generative_props_v6_1/PHOENIX_NFL_PROPS_FULL_MATCHED_BOARD_*.csv
+            Phoenix_NFL_Props_V6_1/phoenix_generative_props_v6_1/PHOENIX_NFL_PROPS_TOP10_ADVERSARIAL_*.json
+          if-no-files-found: error
+          retention-days: 14
