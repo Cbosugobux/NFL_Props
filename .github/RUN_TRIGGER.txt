@@ -1,1 +1,1 @@
-2026-10-01 adversarial top-10 export with DraftKings matching
+2026-10-01 full matched board adversarial run
