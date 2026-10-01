@@ -1,1 +1,1 @@
-2026-10-01 full matched board adversarial run
+2026-10-01 artifact-only full board export with Rams fix
