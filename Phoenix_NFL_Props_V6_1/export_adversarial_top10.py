@@ -164,6 +164,9 @@ def main():
         ['phoenix_probability','history_reliability','uncertainty_multiplier'],
         ascending=[False,False,True]
     ).drop_duplicates(['game_id','player_name','stat','side','line'])
+    full_dest=out/f'PHOENIX_NFL_PROPS_FULL_MATCHED_BOARD_{season}_W{week}.csv'
+    df.to_csv(full_dest,index=False)
+    print(full_dest)
     top=df.head(10).copy()
     packet={
         'engine':'PHOENIX_NFL_PROPS_V6_1_1',
