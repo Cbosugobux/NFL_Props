@@ -1,0 +1,14 @@
+numpy
+pandas
+scipy
+scikit-learn
+xgboost
+requests
+nflreadpy
+polars
+pyarrow
+pydantic
+pydantic-settings
+python-dotenv
+matplotlib
+joblib

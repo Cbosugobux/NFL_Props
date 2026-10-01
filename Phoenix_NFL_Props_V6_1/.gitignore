@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+.env
+.pytest_cache/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Phoenix runtime data and generated outputs
+phoenix_data/
+phoenix_cache/
+phoenix_generative_props_v6_1/
+PHOENIX_NFL_GENERATIVE_PROPS_V6_1_*.zip
+*.joblib
+
+# Large local data artifacts
+*.parquet
+*.sqlite
+*.sqlite3
