@@ -1,5 +1,15 @@
 # Changelog
 
+## 6.1.1
+
+- Enforces simulation-level receiving accounting against the selected quarterback.
+- Listed-player receptions can never exceed simulated QB completions.
+- Listed-player receiving yards can never exceed simulated QB passing yards.
+- Uses capacity-preserving reconciliation rather than inventing catches or yardage.
+- Adds hard coupling QA for completion and passing-yard overruns.
+- Retains V6.1 QB-conditioned catch/YPR coupling, validation, hurdle architecture, calibration gate, and 80,000-simulation framework.
+
+
 ## 6.1.0
 
 - Added QB-conditioned shared passing environment for receiving simulations.
