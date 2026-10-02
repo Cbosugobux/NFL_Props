@@ -1,4 +1,4 @@
-# Phoenix NFL Generative Player Props V6.1.1
+# Phoenix NFL Generative Player Props V6.1.2
 
 Precision-first, model-first NFL player-prop projection engine.
 
@@ -54,7 +54,7 @@ QB environment ratio bounds = 0.82 to 1.18
 - Separate target/carry opportunity hurdles preserving zero-opportunity games.
 - Hurdle calibration promoted only when it improves Brier score on a later chronological holdout.
 - Adaptive residual dispersion from OOF errors.
-- No default probability-temperature adjustment on top of already-widened simulated distributions.
+- Symmetric reliability tempering of extreme probabilities using Phoenix-only history/context uncertainty; sportsbook probabilities are never inputs.
 - Weekly fitted-model fingerprinting for reproducibility.
 - Persistent Parquet historical warehouse with SQLite state/manifest.
 
@@ -112,6 +112,7 @@ PHOENIX_NFL_ROLE_MODEL_METRICS_V6_1_<season>_W<week>.csv
 PHOENIX_NFL_ENSEMBLE_AUDIT_V6_1_<season>_W<week>.csv
 PHOENIX_NFL_ROLE_CALIBRATION_AUDIT_V6_1_<season>_W<week>.csv
 PHOENIX_NFL_QB_RECEIVER_COUPLING_AUDIT_V6_1_<season>_W<week>.csv
+PHOENIX_NFL_DIRECTIONAL_CONCENTRATION_V6_1_<season>_W<week>.csv
 PHOENIX_NFL_GENERATIVE_PROPS_V6_1_<season>_W<week>.json
 PHOENIX_NFL_GENERATIVE_PROPS_V6_1_<season>_W<week>.html
 ```
@@ -158,4 +159,4 @@ Before using a weekly card operationally, review:
 7. personnel/injury context;
 8. the fair ladder at the exact line being considered.
 
-No model guarantees profitable betting results. V6.1 is designed to improve measurement, calibration, structural coherence, and auditability.
+No model guarantees profitable betting results. V6.1.2 is designed to improve measurement, calibration, structural coherence, and auditability.
