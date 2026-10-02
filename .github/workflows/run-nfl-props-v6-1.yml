@@ -120,7 +120,7 @@ jobs:
           m=re.search(r'_(\d{4})_W(\d+)\.csv$',src)
           meta={
               'engine':'PHOENIX_NFL_PROPS',
-              'version':'6.1.1',
+              'version':'6.1.2',
               'season':int(m.group(1)) if m else 2026,
               'week':int(m.group(2)) if m else None,
               'source_sha':'${{ github.sha }}',
