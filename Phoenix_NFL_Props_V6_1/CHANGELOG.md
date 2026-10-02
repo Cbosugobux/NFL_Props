@@ -1,5 +1,14 @@
 # Changelog
 
+## 6.1.2
+
+- Enables symmetric Phoenix-only reliability tempering for extreme final prop probabilities.
+- Tempering uses player history reliability and football-context uncertainty only; sportsbook probabilities remain excluded.
+- Adds directional-concentration diagnostics by stat family without forcing over/under balance.
+- Persists the concentration audit in every production artifact.
+- Makes current-board publishing concurrency-safe.
+
+
 ## 6.1.1
 
 - Enforces simulation-level receiving accounting against the selected quarterback.
