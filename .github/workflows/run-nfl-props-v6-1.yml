@@ -136,9 +136,22 @@ jobs:
           cd ..
           git config user.name "Phoenix Actions"
           git config user.email "actions@users.noreply.github.com"
-          git add phoenix_current_run/NFL_PROPS_FULL_QUALIFYING_BOARD_CURRENT.csv phoenix_current_run/NFL_PROPS_RUN_METADATA_CURRENT.json
-          git commit -m "Publish Phoenix NFL props current full board [skip ci]" || true
-          git push
+          cp phoenix_current_run/NFL_PROPS_FULL_QUALIFYING_BOARD_CURRENT.csv /tmp/NFL_PROPS_FULL_QUALIFYING_BOARD_CURRENT.csv
+          cp phoenix_current_run/NFL_PROPS_RUN_METADATA_CURRENT.json /tmp/NFL_PROPS_RUN_METADATA_CURRENT.json
+          published=false
+          for attempt in 1 2 3 4; do
+            git fetch origin main
+            git reset --hard origin/main
+            mkdir -p phoenix_current_run
+            cp /tmp/NFL_PROPS_FULL_QUALIFYING_BOARD_CURRENT.csv phoenix_current_run/NFL_PROPS_FULL_QUALIFYING_BOARD_CURRENT.csv
+            cp /tmp/NFL_PROPS_RUN_METADATA_CURRENT.json phoenix_current_run/NFL_PROPS_RUN_METADATA_CURRENT.json
+            git add phoenix_current_run/NFL_PROPS_FULL_QUALIFYING_BOARD_CURRENT.csv phoenix_current_run/NFL_PROPS_RUN_METADATA_CURRENT.json
+            if git diff --cached --quiet; then published=true; break; fi
+            git commit -m "Publish Phoenix NFL props current full board [skip ci]"
+            if git push origin HEAD:main; then published=true; break; fi
+            sleep $((attempt * 2))
+          done
+          $published || { echo "Failed to publish current NFL props board after retries"; exit 1; }
 
       - name: Upload Phoenix NFL Props outputs
         if: always()
