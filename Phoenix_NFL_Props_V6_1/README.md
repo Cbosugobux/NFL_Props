@@ -1,8 +1,8 @@
-# Phoenix NFL Generative Player Props V6.1.2
+# Phoenix NFL Generative Player Props V6.2.0
 
 Precision-first, model-first NFL player-prop projection engine.
 
-V6.1 preserves the V6 hurdle/compositional architecture and adds **QB-conditioned receiver coupling** so the QB selected in each Monte Carlo simulation influences the receiving environment in that same simulation.
+V6.2 preserves the V6 hurdle/QB-coupled architecture and repairs **team-level compositional coherence** so independently predicted player usage shares cannot dilute primary roles simply because roster-level centers sum above 100% so the QB selected in each Monte Carlo simulation influences the receiving environment in that same simulation.
 
 ## Core philosophy
 
@@ -159,4 +159,4 @@ Before using a weekly card operationally, review:
 7. personnel/injury context;
 8. the fair ladder at the exact line being considered.
 
-No model guarantees profitable betting results. V6.1.2 is designed to improve measurement, calibration, structural coherence, and auditability.
+No model guarantees profitable betting results. V6.2.0 is designed to improve measurement, calibration, structural coherence, and auditability.
