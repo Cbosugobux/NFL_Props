@@ -17,7 +17,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   run-model:
@@ -101,10 +101,44 @@ jobs:
       - name: Run Phoenix NFL Props V6.1
         run: python nfl_props_v6_1.py
 
-      - name: Export adversarial top 10
+      - name: Export full matched board
         env:
           THE_ODDS_API_KEY: ${{ secrets.THE_ODDS_API_KEY }}
         run: python export_adversarial_top10.py
+
+      - name: Publish current full NFL props board
+        run: |
+          mkdir -p ../phoenix_current_run
+          cp "$(ls -t phoenix_generative_props_v6_1/PHOENIX_NFL_PROPS_FULL_MATCHED_BOARD_*.csv | head -1)" ../phoenix_current_run/NFL_PROPS_FULL_QUALIFYING_BOARD_CURRENT.csv
+          python - <<'PY'
+          import json, re
+          from pathlib import Path
+          import pandas as pd
+          p=Path('../phoenix_current_run/NFL_PROPS_FULL_QUALIFYING_BOARD_CURRENT.csv')
+          df=pd.read_csv(p)
+          src=sorted(Path('phoenix_generative_props_v6_1').glob('PHOENIX_NFL_GENERATIVE_PROPS_V6_1_*.csv'))[-1].name
+          m=re.search(r'_(\d{4})_W(\d+)\.csv$',src)
+          meta={
+              'engine':'PHOENIX_NFL_PROPS',
+              'version':'6.1.1',
+              'season':int(m.group(1)) if m else 2026,
+              'week':int(m.group(2)) if m else None,
+              'source_sha':'${{ github.sha }}',
+              'run_id':'${{ github.run_id }}',
+              'model_first':True,
+              'ev_used':False,
+              'sportsbook_role':'downstream proposition matching and -200 hard ceiling only',
+              'candidate_count':int(len(df))
+          }
+          Path('../phoenix_current_run/NFL_PROPS_RUN_METADATA_CURRENT.json').write_text(json.dumps(meta,indent=2),encoding='utf-8')
+          print(p, len(df))
+          PY
+          cd ..
+          git config user.name "Phoenix Actions"
+          git config user.email "actions@users.noreply.github.com"
+          git add phoenix_current_run/NFL_PROPS_FULL_QUALIFYING_BOARD_CURRENT.csv phoenix_current_run/NFL_PROPS_RUN_METADATA_CURRENT.json
+          git commit -m "Publish Phoenix NFL props current full board [skip ci]" || true
+          git push
 
       - name: Upload Phoenix NFL Props outputs
         if: always()
