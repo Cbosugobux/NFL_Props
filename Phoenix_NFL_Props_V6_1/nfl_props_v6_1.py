@@ -101,7 +101,7 @@ print("pandas:", pd.__version__)
 # ## 2. Configuration
 
 # %%
-MODEL_VERSION = "6.1.1"
+MODEL_VERSION = "6.1.2"
 TARGET_SEASON = 2026
 TARGET_WEEK = 5
 
@@ -207,8 +207,11 @@ TAIL_SHRINK_SLOPE = 0.20
 
 # Probability guard: do not pretend 40k Monte Carlo draws are 40k independent
 # observations. Temper extreme probabilities when player history/context is weak.
-USE_UNCERTAINTY_TEMPERING = False
-MAX_PROBABILITY_TEMPERATURE = 1.40
+USE_UNCERTAINTY_TEMPERING = True
+MAX_PROBABILITY_TEMPERATURE = 1.65
+DIRECTIONAL_CONCENTRATION_PROB_FLOOR = 0.65
+DIRECTIONAL_CONCENTRATION_WARN_SHARE = 0.80
+DIRECTIONAL_CONCENTRATION_MIN_ROWS = 20
 
 # ---------- V6.1 precision / reproducibility controls ----------
 # Weekly football models are frozen by a fingerprint of the historical training data.
@@ -2486,7 +2489,9 @@ def probability_temperature(history_reliability, uncertainty_multiplier):
     if not USE_UNCERTAINTY_TEMPERING:
         return 1.0
     rel=float(np.clip(history_reliability,0,1)); um=max(float(uncertainty_multiplier),1.0)
-    return float(np.clip(1.0 + 0.35*(1.0-rel) + 0.25*(um-1.0),1.0,MAX_PROBABILITY_TEMPERATURE))
+    # Reliability shrinkage is symmetric around 50% and uses only Phoenix
+    # history/context uncertainty. It never references a sportsbook probability.
+    return float(np.clip(1.0 + 0.60*(1.0-rel) + 0.70*(um-1.0),1.0,MAX_PROBABILITY_TEMPERATURE))
 def temper_probability(p,temp):
     p=float(np.clip(p,1e-6,1-1e-6))
     if not USE_UNCERTAINTY_TEMPERING or temp<=1.000001: return p
@@ -2611,6 +2616,26 @@ print("Distribution diagnostics:")
 display(report.groupby(["stat","distribution_flag"]).size().reset_index(name="rows"))
 print("Probability tempering:")
 display(report.groupby("stat")[["probability_temperature","cv","mean_median_gap_pct"]].median().reset_index())
+
+# Quant-only directional concentration diagnostic. This never changes a projection
+# or uses sportsbook implied probability; it simply exposes when matched Phoenix
+# probabilities become overwhelmingly one-sided at meaningful confidence.
+_direction_rows=[]
+for stat,g in fair_ladder.groupby("stat"):
+    gg=g.copy()
+    gg["best_side_probability"]=gg[["p_over","p_under"]].max(axis=1)
+    gg=gg[gg["best_side_probability"].ge(DIRECTIONAL_CONCENTRATION_PROB_FLOOR)].copy()
+    if len(gg)<DIRECTIONAL_CONCENTRATION_MIN_ROWS: continue
+    gg["best_side"]=np.where(gg["p_under"]>=gg["p_over"],"under","over")
+    counts=gg["best_side"].value_counts()
+    top_side=str(counts.index[0]); share=float(counts.iloc[0]/len(gg))
+    _direction_rows.append({"stat":stat,"rows":int(len(gg)),"dominant_side":top_side,
+                            "dominant_share":share,
+                            "flag":"DIRECTIONALLY_CONCENTRATED" if share>=DIRECTIONAL_CONCENTRATION_WARN_SHARE else "OK"})
+directional_concentration_df=pd.DataFrame(_direction_rows)
+if len(directional_concentration_df):
+    print("Directional concentration diagnostics:")
+    display(directional_concentration_df)
 
 # %% [markdown]
 # ## 16. Human-readable HTML dashboard
