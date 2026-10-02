@@ -23,12 +23,15 @@ jobs:
         working-directory: Phoenix_NFL_Props_V6_1
         run: pip install numpy pandas requests
 
-      - name: Download frozen fresh model artifact
+      - name: Download fresh frozen-model artifact
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          rm -rf /tmp/phoenix /tmp/phoenix-artifact.zip
           mkdir -p /tmp/phoenix
-          gh run download 36924210496             -n phoenix-nfl-props-v6-1-36924210496             -D /tmp/phoenix
+          gh api -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/actions/artifacts/11238600106/zip > /tmp/phoenix-artifact.zip
+          unzip -q /tmp/phoenix-artifact.zip -d /tmp/phoenix
           cp -R /tmp/phoenix/phoenix_generative_props_v6_1 Phoenix_NFL_Props_V6_1/
 
       - name: Export full matched board
