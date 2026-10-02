@@ -14,7 +14,7 @@ class SourceIntegrityTests(unittest.TestCase):
     def test_v61_coupling_markers_exist(self):
         s = SOURCE.read_text(encoding="utf-8")
         required = [
-            'MODEL_VERSION = "6.1.2"',
+            'MODEL_VERSION = "6.2.0"',
             'USE_QB_RECEIVER_COUPLING = True',
             'QB_RECEIVER_CATCH_COUPLING = 0.60',
             'QB_RECEIVER_YPR_COUPLING = 0.50',
@@ -24,6 +24,9 @@ class SourceIntegrityTests(unittest.TestCase):
             'QB_RECEIVER_COUPLING_AUDIT_V6_1',
             'USE_UNCERTAINTY_TEMPERING = True',
             'DIRECTIONAL_CONCENTRATION_WARN_SHARE = 0.80',
+            'project_share_centers_to_simplex',
+            'raw_center_sum',
+            'projected_center_sum',
         ]
         for token in required:
             self.assertIn(token, s)
