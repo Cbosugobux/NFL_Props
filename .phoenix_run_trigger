@@ -1,4 +1,2 @@
-Phoenix production run trigger
-Requested: 2026-10-02T14:15:00-04:00
-Purpose: fresh full qualifying board for adversarial review
-Handoff: phoenix_current_run
+RUN MODEL fresh full-board run 2026-10-02 14:23 ET
+engine=NFL_Props
