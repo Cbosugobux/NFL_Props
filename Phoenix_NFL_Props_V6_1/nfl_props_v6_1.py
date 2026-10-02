@@ -2693,9 +2693,10 @@ drivers_csv=OUTPUT_DIR/f"PHOENIX_NFL_GENERATIVE_DRIVERS_V6_1_{TARGET_SEASON}_W{T
 context_csv=OUTPUT_DIR/f"PHOENIX_NFL_PERSONNEL_CONTEXT_{TARGET_SEASON}_W{TARGET_WEEK}.csv"
 qb_scenarios_json=OUTPUT_DIR/f"PHOENIX_NFL_QB_START_SCENARIOS_{TARGET_SEASON}_W{TARGET_WEEK}.json"
 residual_diag_csv=OUTPUT_DIR/f"PHOENIX_NFL_RESIDUAL_CALIBRATION_V6_1_{TARGET_SEASON}_W{TARGET_WEEK}.csv"
+directional_diag_csv=OUTPUT_DIR/f"PHOENIX_NFL_DIRECTIONAL_CONCENTRATION_V6_1_{TARGET_SEASON}_W{TARGET_WEEK}.csv"
 json_file=OUTPUT_DIR/f"PHOENIX_NFL_GENERATIVE_PROPS_V6_1_{TARGET_SEASON}_W{TARGET_WEEK}.json"
 
-report.to_csv(report_csv,index=False); fair_ladder.to_csv(ladder_csv,index=False); metrics_df.to_csv(metrics_csv,index=False); role_metrics_df.to_csv(role_metrics_csv,index=False); player_role_proj.to_csv(role_components_csv,index=False); residual_diag_df.to_csv(residual_diag_csv,index=False); team_component_proj.to_csv(team_components_csv,index=False); player_component_proj.to_csv(player_components_csv,index=False); pd.DataFrame(DRIVER_ROWS).to_csv(drivers_csv,index=False)
+report.to_csv(report_csv,index=False); fair_ladder.to_csv(ladder_csv,index=False); metrics_df.to_csv(metrics_csv,index=False); role_metrics_df.to_csv(role_metrics_csv,index=False); player_role_proj.to_csv(role_components_csv,index=False); residual_diag_df.to_csv(residual_diag_csv,index=False); directional_concentration_df.to_csv(directional_diag_csv,index=False); team_component_proj.to_csv(team_components_csv,index=False); player_component_proj.to_csv(player_components_csv,index=False); pd.DataFrame(DRIVER_ROWS).to_csv(drivers_csv,index=False)
 ctx_cols=[c for c in ["game_id","team","opponent","player_id_key","player_name","position","depth_rank","availability_probability","availability_status","availability_flag","practice_score","preparation_score","replacement_weight","current_season_off_snaps","replacement_candidate","career_games_prior","qb_pseudo_starts","inactivity_weeks","history_reliability","uncertainty_multiplier","starter_probability","qb_scenario_reason"] if c in current.columns]
 current[ctx_cols].drop_duplicates().to_csv(context_csv,index=False); qb_scenarios_json.write_text(json.dumps(QB_START_PROBS,indent=2),encoding="utf-8")
 ensemble_audit_csv=OUTPUT_DIR/f"PHOENIX_NFL_ENSEMBLE_AUDIT_V6_1_{TARGET_SEASON}_W{TARGET_WEEK}.csv"
@@ -2714,7 +2715,7 @@ payload={
     "n_sims":int(N_SIMS),
     "philosophy":"model-first; hurdle plus compositional usage; short-term role change; position-specific opponent context; causal walk-forward ensembles; robust adaptive residuals; QB-conditioned receiving environment; sportsbook lines excluded from predictive features",
     "pricing_condition":"skill props conditional on active; QB passing props conditional on QB starting",
-    "probability_policy":"raw Monte Carlo probabilities drive Phoenix fair odds by default; uncertainty is expressed in the simulated distribution rather than double-tempering probabilities",
+    "probability_policy":"Monte Carlo probabilities are symmetrically reliability-tempered using Phoenix-only player history/context uncertainty; sportsbook probabilities are never inputs",
     "qb_receiver_coupling":{
         "enabled":bool(USE_QB_RECEIVER_COUPLING),
         "catch_strength":float(QB_RECEIVER_CATCH_COUPLING),
@@ -2733,11 +2734,12 @@ payload={
     "fair_ladder":[{k:to_py(v) for k,v in x.items()} for x in fair_ladder.to_dict(orient="records")],
     "team_components":[{k:to_py(v) for k,v in x.items()} for x in team_component_proj.to_dict(orient="records")],
     "player_components":[{k:to_py(v) for k,v in x.items()} for x in player_component_proj.to_dict(orient="records")],
-    "role_components":[{k:to_py(v) for k,v in x.items()} for x in player_role_proj.to_dict(orient="records")]
+    "role_components":[{k:to_py(v) for k,v in x.items()} for x in player_role_proj.to_dict(orient="records")],
+    "directional_concentration":[{k:to_py(v) for k,v in x.items()} for x in directional_concentration_df.to_dict(orient="records")]
 }
 json_file.write_text(json.dumps(payload,indent=2),encoding="utf-8"); zip_base=str(BASE_DIR/f"PHOENIX_NFL_GENERATIVE_PROPS_V6_1_{TARGET_SEASON}_W{TARGET_WEEK}"); zip_path=shutil.make_archive(zip_base,"zip",root_dir=str(OUTPUT_DIR))
 print("Created:")
-for p in [html_file,report_csv,ladder_csv,metrics_csv,role_metrics_csv,role_components_csv,residual_diag_csv,team_components_csv,player_components_csv,drivers_csv,context_csv,qb_scenarios_json,ensemble_audit_csv,role_calibration_csv,qb_receiver_coupling_csv,json_file,zip_path]: print(" ",p)
+for p in [html_file,report_csv,ladder_csv,metrics_csv,role_metrics_csv,role_components_csv,residual_diag_csv,directional_diag_csv,team_components_csv,player_components_csv,drivers_csv,context_csv,qb_scenarios_json,ensemble_audit_csv,role_calibration_csv,qb_receiver_coupling_csv,json_file,zip_path]: print(" ",p)
 try:
     from google.colab import files
     files.download(zip_path)
