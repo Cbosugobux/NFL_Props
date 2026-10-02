@@ -169,7 +169,7 @@ def main():
     print(full_dest)
     top=df.head(10).copy()
     packet={
-        'engine':'PHOENIX_NFL_PROPS_V6_1_2',
+        'engine':'PHOENIX_NFL_PROPS_V6_2_0',
         'season':season,'week':week,'bookmaker':BOOK,
         'purpose':'ADVERSARIAL_ANALYSIS_TRANSFER',
         'model_first':True,'ev_used':False,
