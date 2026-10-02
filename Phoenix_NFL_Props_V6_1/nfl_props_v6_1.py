@@ -1,4 +1,4 @@
-"""Phoenix NFL Generative Player Props V6.1.2 — reliability-tempered QB-coupled production build.
+"""Phoenix NFL Generative Player Props V6.2.0 — coherent compositional-usage production build.
 
 V6.1 extends the V6 hurdle/generative architecture with QB-conditioned passing-environment coupling,
 while retaining time-safe ensemble learning, short-term role features, position-specific opponent context,
@@ -101,7 +101,7 @@ print("pandas:", pd.__version__)
 # ## 2. Configuration
 
 # %%
-MODEL_VERSION = "6.1.2"
+MODEL_VERSION = "6.2.0"
 TARGET_SEASON = 2026
 TARGET_WEEK = 5
 
@@ -2015,6 +2015,35 @@ def reconcile_counts_to_capacity(count_matrix, capacity, rng):
     return out
 
 
+def project_share_centers_to_simplex(base_centers, other_center):
+    """Project independent conditional-share centers onto the valid player-share simplex.
+
+    The component models are fit player-by-player, so their conditional share centers
+    can sum above 100% on a current roster. Proportional renormalization dilutes every
+    player, including the strongest modeled roles. Euclidean simplex projection is the
+    minimum-change coherent reconciliation: large modeled roles are preserved while
+    mutually incompatible small/fringe shares absorb more of the correction.
+    """
+    raw=np.asarray(base_centers,dtype=float)
+    raw=np.nan_to_num(raw,nan=0.0,posinf=1.0,neginf=0.0)
+    raw=np.maximum(raw,0.0)
+    budget=float(np.clip(1.0-float(other_center),1e-6,1.0))
+    if raw.sum()<=budget+1e-12:
+        return raw,{"raw_sum":float(raw.sum()),"projected_sum":float(raw.sum()),
+                    "budget":budget,"l1_adjustment":0.0}
+    u=np.sort(raw)[::-1]
+    cssv=np.cumsum(u)-budget
+    idx=np.arange(1,len(u)+1,dtype=float)
+    valid=u-cssv/idx>0
+    if not np.any(valid):
+        projected=np.zeros_like(raw)
+    else:
+        rho=int(np.where(valid)[0][-1])
+        theta=float(cssv[rho]/(rho+1.0))
+        projected=np.maximum(raw-theta,0.0)
+    return projected,{"raw_sum":float(raw.sum()),"projected_sum":float(projected.sum()),
+                      "budget":budget,"l1_adjustment":float(np.abs(projected-raw).sum())}
+
 def logistic_normal_composition(base_centers, active, replacement_propensity, component_name,
                                 uncertainty_multipliers, other_center):
     """
@@ -2241,6 +2270,7 @@ for team,tg in current_team.groupby("team"):
 
         center_sum=float(np.sum(base))
         other_center=max(0.05,1.0-min(center_sum,0.95))
+        base,center_diag=project_share_centers_to_simplex(base,other_center)
         comp=logistic_normal_composition(
             base,np.column_stack(active),np.array(rp),"target_share",np.array(ums),other_center
         )
@@ -2250,7 +2280,11 @@ for team,tg in current_team.groupby("team"):
             "team":team,"type":"targets",
             "max_sum_error":float(np.max(np.abs(comp.sum(axis=1)-1.0))),
             "min_weight":float(np.min(comp)),
-            "max_weight":float(np.max(comp))
+            "max_weight":float(np.max(comp)),
+            "raw_center_sum":center_diag["raw_sum"],
+            "projected_center_sum":center_diag["projected_sum"],
+            "center_budget":center_diag["budget"],
+            "center_l1_adjustment":center_diag["l1_adjustment"]
         })
         alloc=allocate_counts(team_targets,comp)
 
@@ -2410,6 +2444,7 @@ for team,tg in current_team.groupby("team"):
 
         center_sum=float(np.sum(base))
         other_center=max(0.03,1.0-min(center_sum,0.97))
+        base,center_diag=project_share_centers_to_simplex(base,other_center)
         comp=logistic_normal_composition(
             base,np.column_stack(active),np.array(rp),"carry_share",np.array(ums),other_center
         )
@@ -2419,7 +2454,11 @@ for team,tg in current_team.groupby("team"):
             "team":team,"type":"carries",
             "max_sum_error":float(np.max(np.abs(comp.sum(axis=1)-1.0))),
             "min_weight":float(np.min(comp)),
-            "max_weight":float(np.max(comp))
+            "max_weight":float(np.max(comp)),
+            "raw_center_sum":center_diag["raw_sum"],
+            "projected_center_sum":center_diag["projected_sum"],
+            "center_budget":center_diag["budget"],
+            "center_l1_adjustment":center_diag["l1_adjustment"]
         })
         alloc=allocate_counts(rush_att,comp)
 
