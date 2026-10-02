@@ -1,4 +1,4 @@
-"""Phoenix NFL Generative Player Props V6.1.1 — completion-conserving QB-coupled production build.
+"""Phoenix NFL Generative Player Props V6.1.2 — reliability-tempered QB-coupled production build.
 
 V6.1 extends the V6 hurdle/generative architecture with QB-conditioned passing-environment coupling,
 while retaining time-safe ensemble learning, short-term role features, position-specific opponent context,
