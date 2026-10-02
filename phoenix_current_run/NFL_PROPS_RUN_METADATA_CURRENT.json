@@ -1,12 +1,12 @@
 {
   "engine": "PHOENIX_NFL_PROPS",
-  "version": "6.1.2",
+  "version": "6.2.0",
   "season": 2026,
   "week": 4,
-  "source_sha": "96215d98c39775424b491e74c1593a2c18040361",
-  "run_id": "37059951152",
+  "source_sha": "c64c7a4ce2f6771d6c0fe388077d25b6797bfa37",
+  "run_id": "37061447559",
   "model_first": true,
   "ev_used": false,
   "sportsbook_role": "downstream proposition matching and -200 hard ceiling only",
-  "candidate_count": 203
+  "candidate_count": 205
 }
