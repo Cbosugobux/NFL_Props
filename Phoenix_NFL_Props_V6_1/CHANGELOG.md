@@ -1,5 +1,14 @@
 # Changelog
 
+## 6.2.0
+
+- Fixes a team-usage composition defect exposed by the quantitative diagnostics: independently modeled target/carry share centers could sum above 100% before simulation.
+- Reconciles overfull player-share centers with Euclidean simplex projection before injury/role scenarios and logistic-normal noise.
+- The projection is the minimum-change valid composition: larger modeled roles are preserved while mutually incompatible fringe shares absorb more of the correction instead of proportionally diluting every player.
+- Adds raw/projected center sums and L1 reconciliation size to composition QA.
+- Retains V6.1.2 Phoenix-only reliability tempering, QB/receiver accounting constraints, and sportsbook firewall.
+
+
 ## 6.1.2
 
 - Enables symmetric Phoenix-only reliability tempering for extreme final prop probabilities.
